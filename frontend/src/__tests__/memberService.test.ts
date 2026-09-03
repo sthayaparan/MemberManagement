@@ -17,7 +17,7 @@ describe('memberService', () => {
           id: 1,
           firstName: 'John',
           surname: 'Smith',
-          dob: '1985-05-15',
+          dateOfBirth: '1985-05-15',
           postalCode: '12345',
           mobileNumber: '555-0101',
         },
@@ -46,7 +46,7 @@ describe('memberService', () => {
       const newMember = {
         firstName: 'Jane',
         surname: 'Doe',
-        dob: '1990-03-22',
+        dateOfBirth: '1990-03-22',
         postalCode: '54321',
         mobileNumber: '555-0102',
       };

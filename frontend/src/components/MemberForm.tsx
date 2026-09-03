@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FiUser, FiCalendar, FiMapPin, FiPhone, FiSave } from 'react-icons/fi';
+import { HiOutlineUser, HiOutlineCalendarDays, HiOutlineMapPin, HiOutlineDevicePhoneMobile, HiOutlineCheck } from 'react-icons/hi2';
 import { Member, MemberFormData } from '@/types/Member';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -18,7 +18,8 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
   const [formData, setFormData] = useState<MemberFormData>({
     firstName: initialData?.firstName || '',
     surname: initialData?.surname || '',
-    dateOfBirth: initialData?.dateOfBirth || '',
+    // <input type="date"> requires exactly YYYY-MM-DD; the API returns an ISO datetime.
+    dateOfBirth: initialData?.dateOfBirth.split('T')[0] || '',
     postalCode: initialData?.postalCode || '',
     mobileNumber: initialData?.mobileNumber || '',
   });
@@ -97,7 +98,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
     <Card>
       <CardHeader>
         <h2 className="text-2xl font-bold text-dark-navy flex items-center gap-2">
-          <FiUser className="w-6 h-6 text-blue-primary" />
+          <HiOutlineUser className="w-6 h-6 text-blue-primary" />
           {initialData ? 'Edit Member' : 'Add New Member'}
         </h2>
       </CardHeader>
@@ -121,7 +122,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               onChange={handleChange}
               error={errors.firstName}
               placeholder="John"
-              icon={<FiUser className="w-4 h-4" />}
+              icon={<HiOutlineUser className="w-4 h-4" />}
             />
 
             <Input
@@ -132,7 +133,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               onChange={handleChange}
               error={errors.surname}
               placeholder="Smith"
-              icon={<FiUser className="w-4 h-4" />}
+              icon={<HiOutlineUser className="w-4 h-4" />}
             />
           </div>
 
@@ -144,7 +145,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               value={formData.dateOfBirth}
               onChange={handleChange}
               error={errors.dateOfBirth}
-              icon={<FiCalendar className="w-4 h-4" />}
+              icon={<HiOutlineCalendarDays className="w-4 h-4" />}
             />
 
             <Input
@@ -155,7 +156,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               onChange={handleChange}
               error={errors.postalCode}
               placeholder="12345"
-              icon={<FiMapPin className="w-4 h-4" />}
+              icon={<HiOutlineMapPin className="w-4 h-4" />}
             />
           </div>
 
@@ -167,7 +168,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
             onChange={handleChange}
             error={errors.mobileNumber}
             placeholder="555-0101"
-            icon={<FiPhone className="w-4 h-4" />}
+            icon={<HiOutlineDevicePhoneMobile className="w-4 h-4" />}
           />
 
           <div className="flex gap-3 pt-6">
@@ -177,7 +178,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               size="lg"
               disabled={isLoading}
               isLoading={isLoading}
-              icon={<FiSave className="w-4 h-4" />}
+              icon={<HiOutlineCheck className="w-4 h-4" />}
               className="flex-1"
             >
               {isLoading ? 'Processing' : 'Submit'}

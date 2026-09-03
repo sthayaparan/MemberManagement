@@ -1,6 +1,6 @@
 'use client';
 
-import { FiCheckCircle, FiXCircle, FiAlertCircle, FiInfo, FiX } from 'react-icons/fi';
+import { HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineExclamationTriangle, HiOutlineInformationCircle, HiOutlineXMark } from 'react-icons/hi2';
 
 export type AlertType = 'success' | 'error' | 'warning' | 'info';
 
@@ -26,10 +26,10 @@ export function Alert({ type, message, onClose }: AlertProps) {
   };
 
   const icons = {
-    success: <FiCheckCircle className="w-5 h-5" />,
-    error: <FiXCircle className="w-5 h-5" />,
-    warning: <FiAlertCircle className="w-5 h-5" />,
-    info: <FiInfo className="w-5 h-5" />,
+    success: <HiOutlineCheckCircle className="w-5 h-5" />,
+    error: <HiOutlineXCircle className="w-5 h-5" />,
+    warning: <HiOutlineExclamationTriangle className="w-5 h-5" />,
+    info: <HiOutlineInformationCircle className="w-5 h-5" />,
   };
 
   return (
@@ -43,7 +43,7 @@ export function Alert({ type, message, onClose }: AlertProps) {
           onClick={onClose}
           className="flex-shrink-0 hover:opacity-70 transition-opacity mt-0.5"
         >
-          <FiX className="w-5 h-5" />
+          <HiOutlineXMark className="w-5 h-5" />
         </button>
       )}
     </div>

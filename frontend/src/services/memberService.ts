@@ -6,26 +6,19 @@ const API_BASE_URL = '/api';
 export const memberService = {
   async getAllMembers(): Promise<Member[]> {
     try {
-      const url = `${API_BASE_URL}/members`;
-      console.log(`[memberService] Fetching from: ${url}`);
-      
-      const response = await fetch(url);
-      
-      console.log(`[memberService] Response status: ${response.status}`);
-      
+      const response = await fetch(`${API_BASE_URL}/members`);
+
       if (!response.ok) {
         throw new Error(`Failed to fetch members: ${response.statusText}`);
       }
-      
+
       const result = await response.json();
-      console.log(`[memberService] Response received:`, result);
-      
       const members = result.data || result;
-      
+
       if (!Array.isArray(members)) {
         throw new Error('API response is not an array');
       }
-      
+
       return members;
     } catch (error) {
       console.error('[memberService] Error fetching members:', error);

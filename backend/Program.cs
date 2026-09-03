@@ -44,9 +44,10 @@ if (app.Environment.IsDevelopment())
 // Add request logging middleware
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff}] {context.Request.Method} {context.Request.Path} from {context.Request.Headers.Origin}");
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("{Method} {Path}", context.Request.Method, context.Request.Path);
     await next();
-    Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff}] Response: {context.Response.StatusCode}");
+    logger.LogInformation("Response: {StatusCode}", context.Response.StatusCode);
 });
 
 // Use CORS
@@ -57,8 +58,7 @@ app.UseCors("AllowFrontend");
 
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-    .WithName("HealthCheck")
-    .WithOpenApi();
+    .WithName("HealthCheck");
 
 // Member endpoints
 var memberGroup = app.MapGroup("/api/members")
@@ -66,28 +66,23 @@ var memberGroup = app.MapGroup("/api/members")
 
 // GET all members
 memberGroup.MapGet("/", GetAllMembers)
-    .WithName("GetAllMembers")
-    .WithOpenApi();
+    .WithName("GetAllMembers");
 
 // GET member by ID
 memberGroup.MapGet("/{id}", GetMemberById)
-    .WithName("GetMemberById")
-    .WithOpenApi();
+    .WithName("GetMemberById");
 
 // POST create member
 memberGroup.MapPost("/", CreateMember)
-    .WithName("CreateMember")
-    .WithOpenApi();
+    .WithName("CreateMember");
 
 // PUT update member
 memberGroup.MapPut("/{id}", UpdateMember)
-    .WithName("UpdateMember")
-    .WithOpenApi();
+    .WithName("UpdateMember");
 
 // DELETE member
 memberGroup.MapDelete("/{id}", DeleteMember)
-    .WithName("DeleteMember")
-    .WithOpenApi();
+    .WithName("DeleteMember");
 
 app.Run();
 
@@ -106,13 +101,11 @@ async Task<IResult> GetMemberById(int id, ApplicationDbContext db)
     return Results.Ok(new { data = member });
 }
 
-async Task<IResult> CreateMember(CreateMemberDto dto, ApplicationDbContext db)
+async Task<IResult> CreateMember(MemberRequestDto dto, ApplicationDbContext db)
 {
-    if (string.IsNullOrWhiteSpace(dto.FirstName) || string.IsNullOrWhiteSpace(dto.Surname) ||
-        string.IsNullOrWhiteSpace(dto.PostalCode) || string.IsNullOrWhiteSpace(dto.MobileNumber))
-    {
-        return Results.BadRequest(new { error = "All fields are required", code = "VALIDATION_ERROR" });
-    }
+    var validationError = ValidateMember(dto);
+    if (validationError != null)
+        return Results.BadRequest(new { error = validationError, code = "VALIDATION_ERROR" });
 
     var member = new Member
     {
@@ -129,17 +122,15 @@ async Task<IResult> CreateMember(CreateMemberDto dto, ApplicationDbContext db)
     return Results.Created($"/api/members/{member.Id}", new { data = member });
 }
 
-async Task<IResult> UpdateMember(int id, UpdateMemberDto dto, ApplicationDbContext db)
+async Task<IResult> UpdateMember(int id, MemberRequestDto dto, ApplicationDbContext db)
 {
     var member = await db.Members.FindAsync(id);
     if (member == null)
         return Results.NotFound(new { error = "Member not found", code = "MEMBER_NOT_FOUND" });
 
-    if (string.IsNullOrWhiteSpace(dto.FirstName) || string.IsNullOrWhiteSpace(dto.Surname) ||
-        string.IsNullOrWhiteSpace(dto.PostalCode) || string.IsNullOrWhiteSpace(dto.MobileNumber))
-    {
-        return Results.BadRequest(new { error = "All fields are required", code = "VALIDATION_ERROR" });
-    }
+    var validationError = ValidateMember(dto);
+    if (validationError != null)
+        return Results.BadRequest(new { error = validationError, code = "VALIDATION_ERROR" });
 
     member.FirstName = dto.FirstName.Trim();
     member.Surname = dto.Surname.Trim();
@@ -163,6 +154,23 @@ async Task<IResult> DeleteMember(int id, ApplicationDbContext db)
     await db.SaveChangesAsync();
 
     return Results.NoContent();
+}
+
+// Shared validation for create/update requests. Returns an error message, or null if valid.
+string? ValidateMember(MemberRequestDto dto)
+{
+    if (string.IsNullOrWhiteSpace(dto.FirstName) || string.IsNullOrWhiteSpace(dto.Surname) ||
+        string.IsNullOrWhiteSpace(dto.PostalCode) || string.IsNullOrWhiteSpace(dto.MobileNumber))
+    {
+        return "All fields are required";
+    }
+
+    if (dto.DateOfBirth == default || dto.DateOfBirth.Date > DateTime.UtcNow.Date)
+    {
+        return "Date of birth must be a valid date not in the future";
+    }
+
+    return null;
 }
 
 // Seed initial data
@@ -220,5 +228,7 @@ void SeedDatabase(ApplicationDbContext db)
 }
 
 // DTOs
-record CreateMemberDto(string FirstName, string Surname, DateTime DateOfBirth, string PostalCode, string MobileNumber);
-record UpdateMemberDto(string FirstName, string Surname, DateTime DateOfBirth, string PostalCode, string MobileNumber);
+record MemberRequestDto(string FirstName, string Surname, DateTime DateOfBirth, string PostalCode, string MobileNumber);
+
+// Exposes the top-level Program for WebApplicationFactory in tests.
+public partial class Program;

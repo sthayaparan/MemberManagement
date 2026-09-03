@@ -1,6 +1,6 @@
 'use client';
 
-import { FiX } from 'react-icons/fi';
+import { HiOutlineXMark } from 'react-icons/hi2';
 import { Button } from './Button';
 
 interface ModalProps {
@@ -37,7 +37,7 @@ export function Modal({
             onClick={onClose}
             className="text-gray-text hover:text-dark-navy transition-colors"
           >
-            <FiX className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5" />
           </button>
         </div>
         <div className="px-6 py-5 text-gray-text">{children}</div>

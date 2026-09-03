@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { FiUserPlus, FiCalendar, FiUsers } from 'react-icons/fi';
+import { HiOutlineCalendarDays, HiOutlineUserGroup } from 'react-icons/hi2';
 import { Member } from '@/types/Member';
 import { memberService } from '@/services/memberService';
 import { MemberList } from '@/components/MemberList';
 import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
-import { Button } from '@/components/Button';
 import { Card, CardBody } from '@/components/Card';
 
 export default function Home() {
@@ -20,17 +18,13 @@ export default function Home() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchMembers = async () => {
-    console.log('[page.tsx] fetchMembers called');
     try {
       setIsLoading(true);
       setError(null);
-      console.log('[page.tsx] Calling memberService.getAllMembers()...');
       const data = await memberService.getAllMembers();
-      console.log('[page.tsx] Got data:', data);
       setMembers(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load members';
-      console.error('[page.tsx] Caught error:', err);
       setError(message);
     } finally {
       setIsLoading(false);
@@ -38,8 +32,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    console.log('[page.tsx] useEffect running, calling fetchMembers');
     fetchMembers();
+    // Refresh when the AI chat sidebar creates/edits/deletes a member.
+    window.addEventListener('members:changed', fetchMembers);
+    return () => window.removeEventListener('members:changed', fetchMembers);
   }, []);
 
   const handleDeleteClick = (id: number) => {
@@ -67,27 +63,16 @@ export default function Home() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-5xl font-bold text-dark-navy mb-3 flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-r from-blue-primary/20 to-purple-secondary/20 rounded-lg">
-              <FiUsers className="w-8 h-8 text-blue-primary" />
-            </div>
-            Members Directory
-          </h1>
-          <p className="text-lg text-gray-text font-medium">
-            Manage and organize all your members efficiently
-          </p>
-        </div>
-        <Link href="/members/new">
-          <Button
-            variant="primary"
-            size="lg"
-            icon={<FiUserPlus className="w-5 h-5" />}
-          >
-            Add New Member
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-5xl font-bold text-dark-navy mb-3 flex items-center gap-3">
+          <div className="p-3 bg-gradient-to-r from-blue-primary/20 to-purple-secondary/20 rounded-lg">
+            <HiOutlineUserGroup className="w-8 h-8 text-blue-primary" />
+          </div>
+          Members Directory
+        </h1>
+        <p className="text-lg text-gray-text font-medium">
+          Manage and organize all your members efficiently
+        </p>
       </div>
 
       {/* Error Alert */}
@@ -111,7 +96,7 @@ export default function Home() {
                 <p className="text-4xl font-bold text-dark-navy mt-2">{members.length}</p>
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
-                <FiUsers className="w-8 h-8 text-blue-primary" />
+                <HiOutlineUserGroup className="w-8 h-8 text-blue-primary" />
               </div>
             </CardBody>
           </Card>
@@ -131,7 +116,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="p-4 bg-emerald-50 rounded-lg">
-                <FiCalendar className="w-8 h-8 text-emerald-600" />
+                <HiOutlineCalendarDays className="w-8 h-8 text-emerald-600" />
               </div>
             </CardBody>
           </Card>

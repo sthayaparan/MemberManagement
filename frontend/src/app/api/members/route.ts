@@ -2,10 +2,7 @@ const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhos
 
 export async function GET() {
   try {
-    const url = `${BACKEND_API_URL}/members`;
-    console.log(`[members-proxy] GET all members from: ${url}`);
-    
-    const response = await fetch(url, {
+    const response = await fetch(`${BACKEND_API_URL}/members`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -21,7 +18,6 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log(`[members-proxy] GET success: ${data.data?.length || 0} members`);
     return Response.json(data);
   } catch (error) {
     console.error('[members-proxy] GET error:', error);
@@ -35,8 +31,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log('[members-proxy] POST member:', body);
-    
+
     const response = await fetch(`${BACKEND_API_URL}/members`, {
       method: 'POST',
       headers: {

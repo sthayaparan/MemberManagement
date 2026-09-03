@@ -1,6 +1,4 @@
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'openai/gpt-oss-120b';
+import { Member } from '@/types/Member';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -8,72 +6,33 @@ export interface ChatMessage {
 }
 
 export interface AIResponse {
-  action?: 'create' | 'edit' | 'delete';
+  action?: 'create' | 'edit' | 'delete' | null;
   member?: {
     id?: number;
     firstName: string;
     surname: string;
-    dob: string;
+    dateOfBirth: string;
     postalCode: string;
     mobileNumber: string;
   };
   message: string;
 }
 
-const systemPrompt = `You are a helpful assistant managing member records. When the user requests to create, edit, or delete a member, respond with a JSON object in this format:
-
-{
-  "action": "create|edit|delete",
-  "member": {
-    "id": "number (only for edit/delete)",
-    "firstName": "string",
-    "surname": "string",
-    "dob": "YYYY-MM-DD",
-    "postalCode": "string",
-    "mobileNumber": "string"
-  },
-  "message": "friendly confirmation message"
-}
-
-If the user is not asking for a member operation, just respond with:
-{
-  "action": null,
-  "message": "your response"
-}`;
-
+// Calls our own server-side route (never OpenRouter directly) so the API key
+// stays server-only and is never exposed to the browser bundle.
 export const aiService = {
-  async chat(messages: ChatMessage[]): Promise<AIResponse> {
-    try {
-      const response = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages,
-          ],
-        }),
-      });
+  async chat(messages: ChatMessage[], members: Member[]): Promise<AIResponse> {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, members }),
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-
-      try {
-        return JSON.parse(content);
-      } catch {
-        return { message: content };
-      }
-    } catch (error) {
-      console.error('Error calling AI service:', error);
-      throw error;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to get AI response');
     }
+
+    return response.json();
   },
 };

@@ -63,7 +63,7 @@ export default function EditMemberPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <MemberForm onSubmit={handleSubmit} initialData={member} />
     </div>
   );

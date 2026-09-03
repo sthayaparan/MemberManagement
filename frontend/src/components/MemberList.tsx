@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FiEdit2, FiTrash2, FiUser } from 'react-icons/fi';
+import { HiOutlinePencilSquare, HiOutlineTrash, HiOutlineUserGroup } from 'react-icons/hi2';
 import { Member } from '@/types/Member';
 import { formatDate } from '@/utils/dateFormatter';
 import { Button } from './Button';
@@ -33,13 +33,13 @@ export function MemberList({ members, onDelete, isLoading }: MemberListProps) {
         <CardBody className="text-center py-12">
           <div className="flex justify-center mb-4">
             <div className="p-4 bg-blue-50 rounded-full">
-              <FiUser className="w-8 h-8 text-blue-primary" />
+              <HiOutlineUserGroup className="w-8 h-8 text-blue-primary" />
             </div>
           </div>
           <p className="text-gray-text text-lg mb-2 font-medium">No members found.</p>
           <p className="text-gray-text text-sm mb-6">Get started by adding your first member</p>
           <Link href="/members/new">
-            <Button variant="primary" icon={<FiUser className="w-4 h-4" />}>
+            <Button variant="primary" icon={<HiOutlineUserGroup className="w-4 h-4" />}>
               Add First Member
             </Button>
           </Link>
@@ -69,7 +69,7 @@ export function MemberList({ members, onDelete, isLoading }: MemberListProps) {
               <th className="px-6 py-4 text-left text-sm font-bold text-dark-navy">
                 Mobile Number
               </th>
-              <th className="px-6 py-4 text-center text-sm font-bold text-dark-navy">
+              <th className="px-6 py-4 text-right text-sm font-bold text-dark-navy w-px whitespace-nowrap">
                 Actions
               </th>
             </tr>
@@ -89,35 +89,29 @@ export function MemberList({ members, onDelete, isLoading }: MemberListProps) {
                   {member.surname}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-text">
-                  {(() => {
-                    const formatted = formatDate(member.dateOfBirth);
-                    if (formatted === 'Invalid Date') {
-                      console.warn(`[MemberList] Invalid date for member ${member.id}:`, member.dateOfBirth, 'raw:', JSON.stringify(member));
-                    }
-                    return formatted;
-                  })()}
+                  {formatDate(member.dateOfBirth)}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-text">{member.postalCode}</td>
                 <td className="px-6 py-4 text-sm text-gray-text">{member.mobileNumber}</td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex justify-center gap-2">
-                    <Link href={`/members/${member.id}`}>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<FiEdit2 className="w-4 h-4" />}
-                      >
-                        Edit
-                      </Button>
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      icon={<FiTrash2 className="w-4 h-4" />}
-                      onClick={() => onDelete(member.id)}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-2">
+                    <Link
+                      href={`/members/${member.id}`}
+                      title="Edit member"
+                      aria-label={`Edit ${member.firstName} ${member.surname}`}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-blue-50 text-blue-primary hover:bg-blue-primary hover:text-white transition-colors duration-150"
                     >
-                      Delete
-                    </Button>
+                      <HiOutlinePencilSquare className="w-4 h-4" />
+                    </Link>
+                    <button
+                      type="button"
+                      title="Delete member"
+                      aria-label={`Delete ${member.firstName} ${member.surname}`}
+                      onClick={() => onDelete(member.id)}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors duration-150"
+                    >
+                      <HiOutlineTrash className="w-4 h-4" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -128,3 +122,4 @@ export function MemberList({ members, onDelete, isLoading }: MemberListProps) {
     </Card>
   );
 }
+

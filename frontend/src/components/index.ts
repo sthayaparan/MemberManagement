@@ -6,3 +6,4 @@ export { Alert } from './Alert';
 export { Header } from './Header';
 export { MemberList } from './MemberList';
 export { MemberForm } from './MemberForm';
+export { ChatSidebar } from './ChatSidebar';

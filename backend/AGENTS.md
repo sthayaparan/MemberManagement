@@ -16,9 +16,11 @@ backend/
 │   └── Member.cs              # Member entity with properties
 ├── Data/
 │   └── ApplicationDbContext.cs # EF Core database context
-├── Program.cs                 # API configuration and endpoints
+├── Program.cs                 # API configuration, endpoints, validation, seeding
 ├── appsettings.json          # Configuration with connection string
 └── backend.csproj            # Project file with dependencies
+
+backend.Tests/                 # xUnit integration tests (WebApplicationFactory)
 ```
 
 ## API Endpoints
@@ -106,6 +108,22 @@ dotnet publish -c Release
 - `Microsoft.EntityFrameworkCore.Sqlite` - SQLite database provider
 - `Swashbuckle.AspNetCore` - API documentation
 
+## Testing
+
+Integration tests live in `backend.Tests/` (xUnit + `WebApplicationFactory<Program>`),
+each test run against an isolated temp SQLite file so it never touches `members.db`.
+
+```bash
+cd backend.Tests
+dotnet test
+```
+
+## Logging
+
+Request/response logging and validation errors go through `ILogger` (not
+`Console.WriteLine`), so they respect the configured log levels in
+`appsettings.json` / `appsettings.Development.json`.
+
 ## Error Handling
 
 All errors follow this format:
@@ -165,7 +183,9 @@ Ensure both frontend and backend are running:
 
 - Timestamps (CreatedAt, UpdatedAt) are automatically managed
 - All string fields are trimmed before storage
-- Validation is enforced on both frontend and backend
+- Validation is enforced on both frontend and backend (required fields, and
+  date of birth must be a real, non-future date)
+- Create/update share one `ValidateMember` helper to avoid duplicated rules
 - Database is automatically created on first run
 - No manual migration files needed (using `EnsureCreated()`)
 

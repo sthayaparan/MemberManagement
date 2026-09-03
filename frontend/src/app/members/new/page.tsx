@@ -18,7 +18,7 @@ export default function NewMemberPage() {
   };
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <MemberForm onSubmit={handleSubmit} />
     </div>
   );
