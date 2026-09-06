@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { HiOutlineXMark } from 'react-icons/hi2';
 import { Button } from './Button';
 
@@ -26,15 +27,42 @@ export function Modal({
   isLoading = false,
   isDanger = false,
 }: ModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, isLoading, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 border border-slate-200">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+      onClick={() => !isLoading && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 border border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white rounded-t-xl">
           <h2 className="text-lg font-bold text-dark-navy">{title}</h2>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-gray-text hover:text-dark-navy transition-colors"
           >
             <HiOutlineXMark className="w-5 h-5" />

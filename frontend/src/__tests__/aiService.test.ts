@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aiService } from '@/services/aiService';
 
-global.fetch = vi.fn();
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('aiService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('posts messages and members to the local /api/chat route', async () => {
     const aiResponse = { action: null, message: 'Hello!' };
     vi.mocked(global.fetch).mockResolvedValueOnce({

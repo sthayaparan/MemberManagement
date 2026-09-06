@@ -7,20 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddOpenApi();
 
-// Add CORS support for frontend
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:3000", "http://127.0.0.1:3000")
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
-});
-
 // Add Entity Framework Core with SQLite
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=members.db";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
@@ -41,6 +29,23 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Turn any unhandled exception into the same { error, code } envelope the rest
+// of the API uses, and log it with request context.
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Unhandled exception for {Method} {Path}", context.Request.Method, context.Request.Path);
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await context.Response.WriteAsJsonAsync(new { error = "Internal server error", code = "INTERNAL_ERROR" });
+    }
+});
+
 // Add request logging middleware
 app.Use(async (context, next) =>
 {
@@ -50,12 +55,6 @@ app.Use(async (context, next) =>
     logger.LogInformation("Response: {StatusCode}", context.Response.StatusCode);
 });
 
-// Use CORS
-app.UseCors("AllowFrontend");
-
-// Remove HTTPS redirection for local development
-// app.UseHttpsRedirection();
-
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .WithName("HealthCheck");
@@ -64,25 +63,11 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 var memberGroup = app.MapGroup("/api/members")
     .WithTags("Members");
 
-// GET all members
-memberGroup.MapGet("/", GetAllMembers)
-    .WithName("GetAllMembers");
-
-// GET member by ID
-memberGroup.MapGet("/{id}", GetMemberById)
-    .WithName("GetMemberById");
-
-// POST create member
-memberGroup.MapPost("/", CreateMember)
-    .WithName("CreateMember");
-
-// PUT update member
-memberGroup.MapPut("/{id}", UpdateMember)
-    .WithName("UpdateMember");
-
-// DELETE member
-memberGroup.MapDelete("/{id}", DeleteMember)
-    .WithName("DeleteMember");
+memberGroup.MapGet("/", GetAllMembers).WithName("GetAllMembers");
+memberGroup.MapGet("/{id}", GetMemberById).WithName("GetMemberById");
+memberGroup.MapPost("/", CreateMember).WithName("CreateMember");
+memberGroup.MapPut("/{id}", UpdateMember).WithName("UpdateMember");
+memberGroup.MapDelete("/{id}", DeleteMember).WithName("DeleteMember");
 
 app.Run();
 
@@ -138,7 +123,7 @@ async Task<IResult> UpdateMember(int id, MemberRequestDto dto, ApplicationDbCont
     member.PostalCode = dto.PostalCode.Trim();
     member.MobileNumber = dto.MobileNumber.Trim();
 
-    db.Members.Update(member);
+    // member is already tracked from FindAsync; SaveChanges persists the edits.
     await db.SaveChangesAsync();
 
     return Results.Ok(new { data = member });
@@ -163,6 +148,16 @@ string? ValidateMember(MemberRequestDto dto)
         string.IsNullOrWhiteSpace(dto.PostalCode) || string.IsNullOrWhiteSpace(dto.MobileNumber))
     {
         return "All fields are required";
+    }
+
+    if (dto.FirstName.Trim().Length > 100 || dto.Surname.Trim().Length > 100)
+    {
+        return "First name and surname must be 100 characters or fewer";
+    }
+
+    if (dto.PostalCode.Trim().Length > 20 || dto.MobileNumber.Trim().Length > 20)
+    {
+        return "Postal code and mobile number must be 20 characters or fewer";
     }
 
     if (dto.DateOfBirth == default || dto.DateOfBirth.Date > DateTime.UtcNow.Date)

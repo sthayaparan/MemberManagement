@@ -49,20 +49,16 @@ export function Button({
     <button
       className={`${baseStyles} ${variantStyles} ${sizeStyles} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (
-        <>
-          <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          Processing...
-        </>
+        <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
       ) : (
-        <>
-          {icon && iconPosition === 'left' && iconElement}
-          {children}
-          {icon && iconPosition === 'right' && iconElement}
-        </>
+        icon && iconPosition === 'left' && iconElement
       )}
+      {children}
+      {!isLoading && icon && iconPosition === 'right' && iconElement}
     </button>
   );
 }

@@ -36,12 +36,12 @@ public class Member
     public required string MobileNumber { get; set; }
 
     /// <summary>
-    /// Timestamp when the member was created.
+    /// Timestamp when the member was created. Set by ApplicationDbContext on save.
     /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// Timestamp when the member was last updated.
+    /// Timestamp when the member was last updated. Set by ApplicationDbContext on save.
     /// </summary>
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }

@@ -18,13 +18,15 @@ frontend/
 │   │   ├── members/new/page.tsx     # Add member
 │   │   ├── members/page.tsx         # Redirects to home (list lives there)
 │   │   └── api/
-│   │       ├── members/[route.ts,[id]/route.ts]  # Proxy to backend (avoids CORS)
+│   │       ├── members/[route.ts, [id]/route.ts]  # Proxy to backend
 │   │       └── chat/route.ts        # Server-side OpenRouter proxy (holds API key)
 │   ├── components/                  # Button, Input, Modal, Card, Alert, Header,
 │   │                                 # MemberForm, MemberList, ChatSidebar
 │   ├── services/
 │   │   ├── memberService.ts         # Calls /api/members/* (client-safe)
 │   │   └── aiService.ts             # Calls /api/chat (client-safe)
+│   ├── lib/backend.ts               # Backend URL + proxyToBackend() helper (server-only)
+│   ├── utils/dateFormatter.ts
 │   └── types/Member.ts
 ```
 
@@ -35,6 +37,12 @@ frontend/
    (`app/api/members/*`, `app/api/chat`), which proxy to the real backend /
    OpenRouter server-side. This avoids CORS issues and keeps secrets off the client.
    - `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:5156/api`) - backend URL, used server-side by the proxy routes.
+   - The members proxy routes share `proxyToBackend()` in `lib/backend.ts`: it
+     passes the backend's JSON body and status straight through, maps a 204 to an
+     empty response, and turns a connection failure into
+     `{ error, code: "BACKEND_UNAVAILABLE" }` (502) so the client always gets JSON.
+   - `memberService` expects the `{ data }` / `{ error, code }` envelope exactly -
+     no response-shape fallbacks.
 
 2. **AI chat sidebar** (`components/ChatSidebar.tsx`): Collapsible panel, always
    available via a floating toggle button (rendered in the root layout). On send:
@@ -50,17 +58,26 @@ frontend/
    is only ever read in `app/api/chat/route.ts` (server-side) - never exposed to
    the client bundle.
 
-4. **Validation**: Client-side validation in `MemberForm` is for UX only; the
-   backend is the source of truth and re-validates everything.
+4. **Validation**: Client-side validation in `MemberForm` (required fields, and a
+   "not in the future" check on the date of birth) is for UX only; the backend is
+   the source of truth and re-validates everything. On success the page navigates
+   away, so `MemberForm` only renders errors, never a success state.
+
+5. **AI response parsing**: `app/api/chat/route.ts` pulls the first balanced
+   `{ ... }` block out of the model's reply (models often wrap JSON in ```` ``` ````
+   fences or add prose), and only the member `id`, `firstName`, and `surname` are
+   sent to OpenRouter for context - not DOB, postal code, or mobile number.
 
 ## Development
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev       # http://localhost:3000
 npm run build
-npm test         # vitest (unit/component)
-npm run test:e2e # playwright
+npm run lint
+npm test          # vitest (unit/component)
+npm test -- --coverage   # enforces the thresholds in vitest.config.ts
+npm run test:e2e  # playwright; stubs /api/* so no backend is needed
 ```
 
 ## Notes

@@ -19,7 +19,7 @@ export function Header() {
           </Link>
           <nav className="flex items-center gap-2">
             <Link
-              href="/members"
+              href="/"
               className="px-4 py-2.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/10 transition-colors font-semibold text-sm uppercase tracking-wide flex items-center gap-2"
             >
               <HiOutlineUserGroup className="w-4 h-4" />

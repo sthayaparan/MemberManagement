@@ -16,9 +16,3 @@ export interface MemberFormData {
   postalCode: string;
   mobileNumber: string;
 }
-
-export interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-  code?: string;
-}

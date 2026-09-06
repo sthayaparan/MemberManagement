@@ -1,3 +1,13 @@
 .env
+
+# .NET build output
 bin/
 obj/
+
+# SQLite database (regenerated on startup via EnsureCreated + seeding)
+*.db
+*.db-shm
+*.db-wal
+
+# TypeScript incremental build cache
+*.tsbuildinfo

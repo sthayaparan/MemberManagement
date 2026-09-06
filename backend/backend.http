@@ -1,6 +1,40 @@
 @backend_HostAddress = http://localhost:5156
 
-GET {{backend_HostAddress}}/weatherforecast/
+### Health check
+GET {{backend_HostAddress}}/health
 Accept: application/json
 
-###
+### List all members
+GET {{backend_HostAddress}}/api/members
+Accept: application/json
+
+### Get a single member
+GET {{backend_HostAddress}}/api/members/1
+Accept: application/json
+
+### Create a member
+POST {{backend_HostAddress}}/api/members
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "surname": "Doe",
+  "dateOfBirth": "1990-01-01",
+  "postalCode": "SW1A 1AA",
+  "mobileNumber": "+44 7700 900123"
+}
+
+### Update a member
+PUT {{backend_HostAddress}}/api/members/1
+Content-Type: application/json
+
+{
+  "firstName": "Jane",
+  "surname": "Doe",
+  "dateOfBirth": "1990-01-01",
+  "postalCode": "E1 6AN",
+  "mobileNumber": "+44 7700 900124"
+}
+
+### Delete a member
+DELETE {{backend_HostAddress}}/api/members/1

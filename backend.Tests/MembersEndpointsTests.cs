@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -12,7 +11,7 @@ using MemberManagementApi.Data;
 namespace backend.Tests;
 
 /// <summary>
-/// Boots the real app with an isolated, file-based SQLite database per test class instance.
+/// Boots the real app with an isolated, file-based SQLite database.
 /// </summary>
 public class MemberApiFactory : WebApplicationFactory<Program>
 {
@@ -38,13 +37,46 @@ public class MemberApiFactory : WebApplicationFactory<Program>
     }
 }
 
-public class MembersEndpointsTests : IClassFixture<MemberApiFactory>
+/// <summary>
+/// One factory (and one fresh temp database) per test method, so tests never
+/// see each other's writes.
+/// </summary>
+public class MembersEndpointsTests : IDisposable
 {
+    private readonly MemberApiFactory _factory = new();
     private readonly HttpClient _client;
 
-    public MembersEndpointsTests(MemberApiFactory factory)
+    public MembersEndpointsTests()
     {
-        _client = factory.CreateClient();
+        _client = _factory.CreateClient();
+    }
+
+    public void Dispose()
+    {
+        _client.Dispose();
+        _factory.Dispose();
+    }
+
+    private record MemberDto(int Id, string FirstName, string Surname, DateTime DateOfBirth, string PostalCode, string MobileNumber, DateTime CreatedAt, DateTime UpdatedAt);
+    private record MemberResponse(MemberDto Data);
+    private record MembersResponse(List<MemberDto> Data);
+    private record ErrorResponse(string Error, string Code);
+
+    private static object ValidRequest(string firstName = "Test", string surname = "User") => new
+    {
+        firstName,
+        surname,
+        dateOfBirth = "1990-01-01",
+        postalCode = "AB1 2CD",
+        mobileNumber = "07700900123"
+    };
+
+    [Fact]
+    public async Task Health_ReturnsHealthy()
+    {
+        var response = await _client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -54,53 +86,54 @@ public class MembersEndpointsTests : IClassFixture<MemberApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MembersResponse>();
-        Assert.True(body!.Data.Count >= 5);
+        Assert.Equal(5, body!.Data.Count);
     }
 
     [Fact]
-    public async Task GetMemberById_UnknownId_ReturnsNotFound()
+    public async Task GetMemberById_ExistingMember_ReturnsMember()
+    {
+        var response = await _client.GetAsync("/api/members/1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MemberResponse>();
+        Assert.Equal(1, body!.Data.Id);
+        Assert.False(string.IsNullOrWhiteSpace(body.Data.FirstName));
+    }
+
+    [Fact]
+    public async Task GetMemberById_UnknownId_ReturnsNotFoundEnvelope()
     {
         var response = await _client.GetAsync("/api/members/999999");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("MEMBER_NOT_FOUND", body!.Code);
     }
 
     [Fact]
-    public async Task CreateMember_ValidData_ReturnsCreated()
+    public async Task CreateMember_ValidData_ReturnsCreatedWithTimestamps()
     {
-        var request = new
-        {
-            firstName = "Test",
-            surname = "User",
-            dateOfBirth = "1990-01-01",
-            postalCode = "AB1 2CD",
-            mobileNumber = "07700900123"
-        };
-
-        var response = await _client.PostAsJsonAsync("/api/members", request);
+        var response = await _client.PostAsJsonAsync("/api/members", ValidRequest());
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MemberResponse>();
         Assert.Equal("Test", body!.Data.FirstName);
+        Assert.NotEqual(default, body.Data.CreatedAt);
+        Assert.NotEqual(default, body.Data.UpdatedAt);
+        Assert.EndsWith($"/api/members/{body.Data.Id}", response.Headers.Location!.ToString());
     }
 
     [Theory]
     [InlineData("", "User")]
     [InlineData("Test", "")]
-    public async Task CreateMember_MissingRequiredField_ReturnsBadRequest(string firstName, string surname)
+    [InlineData("   ", "User")]
+    public async Task CreateMember_MissingOrBlankRequiredField_ReturnsBadRequest(string firstName, string surname)
     {
-        var request = new
-        {
-            firstName,
-            surname,
-            dateOfBirth = "1990-01-01",
-            postalCode = "AB1 2CD",
-            mobileNumber = "07700900123"
-        };
-
-        var response = await _client.PostAsJsonAsync("/api/members", request);
+        var response = await _client.PostAsJsonAsync("/api/members", ValidRequest(firstName, surname));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("VALIDATION_ERROR", body!.Code);
     }
 
     [Fact]
@@ -121,58 +154,63 @@ public class MembersEndpointsTests : IClassFixture<MemberApiFactory>
     }
 
     [Fact]
-    public async Task UpdateMember_ExistingMember_ReturnsOk()
+    public async Task CreateMember_OverlongName_ReturnsBadRequest()
     {
-        var created = await _client.PostAsJsonAsync("/api/members", new
+        var request = new
         {
-            firstName = "Before",
-            surname = "Update",
+            firstName = new string('a', 101),
+            surname = "User",
             dateOfBirth = "1990-01-01",
             postalCode = "AB1 2CD",
             mobileNumber = "07700900123"
-        });
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/members", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMember_ExistingMember_ReturnsOkAndBumpsUpdatedAt()
+    {
+        var created = await _client.PostAsJsonAsync("/api/members", ValidRequest("Before"));
         var createdBody = await created.Content.ReadFromJsonAsync<MemberResponse>();
 
-        var response = await _client.PutAsJsonAsync($"/api/members/{createdBody!.Data.Id}", new
-        {
-            firstName = "After",
-            surname = "Update",
-            dateOfBirth = "1990-01-01",
-            postalCode = "AB1 2CD",
-            mobileNumber = "07700900123"
-        });
+        var response = await _client.PutAsJsonAsync($"/api/members/{createdBody!.Data.Id}", ValidRequest("After"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MemberResponse>();
         Assert.Equal("After", body!.Data.FirstName);
+        Assert.True(body.Data.UpdatedAt >= createdBody.Data.UpdatedAt);
     }
 
     [Fact]
     public async Task UpdateMember_UnknownId_ReturnsNotFound()
     {
-        var response = await _client.PutAsJsonAsync("/api/members/999999", new
+        var response = await _client.PutAsJsonAsync("/api/members/999999", ValidRequest());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMember_InvalidBody_ReturnsBadRequest()
+    {
+        var response = await _client.PutAsJsonAsync("/api/members/1", new
         {
-            firstName = "Test",
+            firstName = "",
             surname = "User",
             dateOfBirth = "1990-01-01",
             postalCode = "AB1 2CD",
             mobileNumber = "07700900123"
         });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
     public async Task DeleteMember_ExistingMember_ReturnsNoContentThenNotFound()
     {
-        var created = await _client.PostAsJsonAsync("/api/members", new
-        {
-            firstName = "ToDelete",
-            surname = "Member",
-            dateOfBirth = "1990-01-01",
-            postalCode = "AB1 2CD",
-            mobileNumber = "07700900123"
-        });
+        var created = await _client.PostAsJsonAsync("/api/members", ValidRequest("ToDelete"));
         var createdBody = await created.Content.ReadFromJsonAsync<MemberResponse>();
 
         var deleteResponse = await _client.DeleteAsync($"/api/members/{createdBody!.Data.Id}");
@@ -189,8 +227,4 @@ public class MembersEndpointsTests : IClassFixture<MemberApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    private record MemberDto(int Id, string FirstName, string Surname, DateTime DateOfBirth, string PostalCode, string MobileNumber);
-    private record MemberResponse(MemberDto Data);
-    private record MembersResponse(List<MemberDto> Data);
 }

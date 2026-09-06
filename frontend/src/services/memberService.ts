@@ -1,93 +1,54 @@
 import { Member, MemberFormData } from '@/types/Member';
 
-// Use Next.js API routes as proxy to backend (avoids CORS issues)
+// Calls the same-origin Next.js proxy routes (app/api/members/*), never the
+// backend directly. Every response body is the API envelope: { data } on
+// success, { error, code } on failure.
 const API_BASE_URL = '/api';
+
+async function readError(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null);
+  return body?.error || `Request failed (${response.status})`;
+}
 
 export const memberService = {
   async getAllMembers(): Promise<Member[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/members`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch members: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const members = result.data || result;
-
-      if (!Array.isArray(members)) {
-        throw new Error('API response is not an array');
-      }
-
-      return members;
-    } catch (error) {
-      console.error('[memberService] Error fetching members:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/members`);
+    if (!response.ok) throw new Error(await readError(response));
+    const { data } = await response.json();
+    return data;
   },
 
   async getMember(id: number): Promise<Member> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/members/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch member');
-      const result = await response.json();
-      return result.data || result;
-    } catch (error) {
-      console.error(`Error fetching member ${id}:`, error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/members/${id}`);
+    if (!response.ok) throw new Error(await readError(response));
+    const { data } = await response.json();
+    return data;
   },
 
   async createMember(data: MemberFormData): Promise<Member> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create member');
-      }
-      const result = await response.json();
-      return result.data || result;
-    } catch (error) {
-      console.error('Error creating member:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    return (await response.json()).data;
   },
 
   async updateMember(id: number, data: MemberFormData): Promise<Member> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/members/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update member');
-      }
-      const result = await response.json();
-      return result.data || result;
-    } catch (error) {
-      console.error(`Error updating member ${id}:`, error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/members/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    return (await response.json()).data;
   },
 
   async deleteMember(id: number): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/members/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete member');
-      }
-    } catch (error) {
-      console.error(`Error deleting member ${id}:`, error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/members/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error(await readError(response));
   },
 };

@@ -1,36 +1,14 @@
+// Formats an ISO date string (YYYY-MM-DD or a full ISO datetime) as "15 May 1980".
+// Builds the Date from parts to avoid the UTC-shift you get from new Date('YYYY-MM-DD').
 export function formatDate(dateString: string): string {
   if (!dateString) return '-';
 
-  try {
-    // Parse ISO date string (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
-    // Split by 'T' to get just the date part
-    const datePart = dateString.split('T')[0];
-    const [year, month, day] = datePart.split('-');
+  const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+  const date = new Date(year, month - 1, day);
 
-    // Validate parsed values
-    if (!year || !month || !day) {
-      console.warn(`[formatDate] Invalid date parts: year=${year}, month=${month}, day=${day} from "${dateString}"`);
-      return 'Invalid Date';
-    }
-
-    // Create date from components to avoid timezone issues
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-    // Validate the date
-    if (isNaN(date.getTime())) {
-      console.warn(`[formatDate] Invalid date result from "${dateString}"`);
-      return 'Invalid Date';
-    }
-
-    const formatted = date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-
-    return formatted;
-  } catch (error) {
-    console.error(`[formatDate] Error formatting date "${dateString}":`, error);
-    return 'Invalid Date';
-  }
+  return date.toLocaleDateString('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }

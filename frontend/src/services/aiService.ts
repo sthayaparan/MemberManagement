@@ -5,15 +5,17 @@ export interface ChatMessage {
   content: string;
 }
 
+// The model returns only the fields relevant to the action: everything for a
+// create, "id" plus changed fields for an edit, just "id" for a delete.
 export interface AIResponse {
   action?: 'create' | 'edit' | 'delete' | null;
   member?: {
     id?: number;
-    firstName: string;
-    surname: string;
-    dateOfBirth: string;
-    postalCode: string;
-    mobileNumber: string;
+    firstName?: string;
+    surname?: string;
+    dateOfBirth?: string;
+    postalCode?: string;
+    mobileNumber?: string;
   };
   message: string;
 }

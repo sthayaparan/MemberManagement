@@ -9,12 +9,8 @@ export default function NewMemberPage() {
   const router = useRouter();
 
   const handleSubmit = async (data: MemberFormData) => {
-    try {
-      await memberService.createMember(data);
-      router.push('/');
-    } catch (error) {
-      throw error;
-    }
+    await memberService.createMember(data);
+    router.push('/');
   };
 
   return (

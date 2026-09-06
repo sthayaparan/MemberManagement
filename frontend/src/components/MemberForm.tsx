@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { HiOutlineUser, HiOutlineCalendarDays, HiOutlineMapPin, HiOutlineDevicePhoneMobile, HiOutlineCheck } from 'react-icons/hi2';
+import {
+  HiOutlineUser,
+  HiOutlineCalendarDays,
+  HiOutlineMapPin,
+  HiOutlineDevicePhoneMobile,
+  HiOutlineCheck,
+} from 'react-icons/hi2';
 import { Member, MemberFormData } from '@/types/Member';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -9,88 +15,70 @@ import { Card, CardBody, CardHeader } from './Card';
 import { Alert } from './Alert';
 
 interface MemberFormProps {
+  // Resolves once the member is saved. The parent navigates away on success,
+  // so this component only needs to surface validation and submit errors.
   onSubmit: (data: MemberFormData) => Promise<void>;
   initialData?: Member;
-  isLoading?: boolean;
 }
 
-export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps) {
-  const [formData, setFormData] = useState<MemberFormData>({
-    firstName: initialData?.firstName || '',
-    surname: initialData?.surname || '',
-    // <input type="date"> requires exactly YYYY-MM-DD; the API returns an ISO datetime.
-    dateOfBirth: initialData?.dateOfBirth.split('T')[0] || '',
-    postalCode: initialData?.postalCode || '',
-    mobileNumber: initialData?.mobileNumber || '',
-  });
+const EMPTY: MemberFormData = {
+  firstName: '',
+  surname: '',
+  dateOfBirth: '',
+  postalCode: '',
+  mobileNumber: '',
+};
+
+export function MemberForm({ onSubmit, initialData }: MemberFormProps) {
+  const [formData, setFormData] = useState<MemberFormData>(
+    initialData
+      ? {
+          firstName: initialData.firstName,
+          surname: initialData.surname,
+          // <input type="date"> needs exactly YYYY-MM-DD; the API returns an ISO datetime.
+          dateOfBirth: initialData.dateOfBirth.split('T')[0],
+          postalCode: initialData.postalCode,
+          mobileNumber: initialData.mobileNumber,
+        }
+      : EMPTY
+  );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  const validate = (): boolean => {
+    const next: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
-    if (!formData.surname.trim()) {
-      newErrors.surname = 'Surname is required';
-    }
+    if (!formData.firstName.trim()) next.firstName = 'First name is required';
+    if (!formData.surname.trim()) next.surname = 'Surname is required';
+    if (!formData.postalCode.trim()) next.postalCode = 'Postal code is required';
+    if (!formData.mobileNumber.trim()) next.mobileNumber = 'Mobile number is required';
     if (!formData.dateOfBirth) {
-      newErrors.dateOfBirth = 'Date of birth is required';
-    }
-    if (!formData.postalCode.trim()) {
-      newErrors.postalCode = 'Postal code is required';
-    }
-    if (!formData.mobileNumber.trim()) {
-      newErrors.mobileNumber = 'Mobile number is required';
+      next.dateOfBirth = 'Date of birth is required';
+    } else if (formData.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+      next.dateOfBirth = 'Date of birth cannot be in the future';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
+    if (!validate()) return;
 
     try {
+      setIsSubmitting(true);
       await onSubmit(formData);
-      setSuccessMessage(
-        initialData
-          ? 'Member updated successfully!'
-          : 'Member created successfully!'
-      );
-      if (!initialData) {
-        setFormData({
-          firstName: '',
-          surname: '',
-          dateOfBirth: '',
-          postalCode: '',
-          mobileNumber: '',
-        });
-      }
     } catch (error) {
-      setErrors({
-        form: error instanceof Error ? error.message : 'An error occurred',
-      });
+      setErrors({ form: error instanceof Error ? error.message : 'An error occurred' });
+      setIsSubmitting(false);
     }
   };
 
@@ -104,13 +92,6 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-5">
-          {successMessage && (
-            <Alert
-              type="success"
-              message={successMessage}
-              onClose={() => setSuccessMessage('')}
-            />
-          )}
           {errors.form && <Alert type="error" message={errors.form} />}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -118,6 +99,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               label="First Name"
               name="firstName"
               type="text"
+              maxLength={100}
               value={formData.firstName}
               onChange={handleChange}
               error={errors.firstName}
@@ -129,6 +111,7 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               label="Surname"
               name="surname"
               type="text"
+              maxLength={100}
               value={formData.surname}
               onChange={handleChange}
               error={errors.surname}
@@ -152,10 +135,11 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               label="Postal Code"
               name="postalCode"
               type="text"
+              maxLength={20}
               value={formData.postalCode}
               onChange={handleChange}
               error={errors.postalCode}
-              placeholder="12345"
+              placeholder="SW1A 1AA"
               icon={<HiOutlineMapPin className="w-4 h-4" />}
             />
           </div>
@@ -164,10 +148,11 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
             label="Mobile Number"
             name="mobileNumber"
             type="tel"
+            maxLength={20}
             value={formData.mobileNumber}
             onChange={handleChange}
             error={errors.mobileNumber}
-            placeholder="555-0101"
+            placeholder="+44 7700 900000"
             icon={<HiOutlineDevicePhoneMobile className="w-4 h-4" />}
           />
 
@@ -176,12 +161,11 @@ export function MemberForm({ onSubmit, initialData, isLoading }: MemberFormProps
               type="submit"
               variant="primary"
               size="lg"
-              disabled={isLoading}
-              isLoading={isLoading}
+              isLoading={isSubmitting}
               icon={<HiOutlineCheck className="w-4 h-4" />}
               className="flex-1"
             >
-              {isLoading ? 'Processing' : 'Submit'}
+              {initialData ? 'Save Changes' : 'Add Member'}
             </Button>
           </div>
         </form>

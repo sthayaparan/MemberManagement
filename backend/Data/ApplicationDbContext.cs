@@ -40,9 +40,6 @@ public class ApplicationDbContext : DbContext
         memberEntity.Property(m => m.MobileNumber).IsRequired().HasMaxLength(20);
         memberEntity.Property(m => m.CreatedAt).IsRequired();
         memberEntity.Property(m => m.UpdatedAt).IsRequired();
-
-        // Create an index on surname for efficient searching
-        memberEntity.HasIndex(m => m.Surname).HasDatabaseName("IX_Members_Surname");
     }
 
     /// <summary>
@@ -64,18 +61,21 @@ public class ApplicationDbContext : DbContext
     }
 
     /// <summary>
-    /// Updates the UpdatedAt timestamp for modified entities.
+    /// Stamps CreatedAt on new members and UpdatedAt on new or modified members,
+    /// all from a single clock reading so the values stay consistent.
     /// </summary>
     private void UpdateTimestamps()
     {
-        var entries = ChangeTracker.Entries()
-            .Where(e => e.Entity is Member && (e.State == EntityState.Modified || e.State == EntityState.Added));
+        var now = DateTime.UtcNow;
+        var entries = ChangeTracker.Entries<Member>()
+            .Where(e => e.State == EntityState.Modified || e.State == EntityState.Added);
 
         foreach (var entry in entries)
         {
-            if (entry.Entity is Member member)
+            entry.Entity.UpdatedAt = now;
+            if (entry.State == EntityState.Added)
             {
-                member.UpdatedAt = DateTime.UtcNow;
+                entry.Entity.CreatedAt = now;
             }
         }
     }

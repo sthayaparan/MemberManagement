@@ -15,33 +15,28 @@ export default function EditMemberPage() {
   const router = useRouter();
   const params = useParams();
 
-  const memberId = parseInt(params.id as string, 10);
+  const memberId = Number(params.id);
+  const isValidId = Number.isInteger(memberId) && memberId > 0;
 
   useEffect(() => {
-    const fetchMember = async () => {
-      try {
-        const data = await memberService.getMember(memberId);
-        setMember(data);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load member';
-        setError(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (memberId) {
-      fetchMember();
+    if (!isValidId) {
+      setError('Member not found');
+      setIsLoading(false);
+      return;
     }
-  }, [memberId]);
+
+    memberService
+      .getMember(memberId)
+      .then(setMember)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load member')
+      )
+      .finally(() => setIsLoading(false));
+  }, [memberId, isValidId]);
 
   const handleSubmit = async (data: MemberFormData) => {
-    try {
-      await memberService.updateMember(memberId, data);
-      router.push('/');
-    } catch (error) {
-      throw error;
-    }
+    await memberService.updateMember(memberId, data);
+    router.push('/');
   };
 
   if (isLoading) {
@@ -54,12 +49,8 @@ export default function EditMemberPage() {
     );
   }
 
-  if (error) {
-    return <Alert type="error" message={error} />;
-  }
-
-  if (!member) {
-    return <Alert type="error" message="Member not found" />;
+  if (error || !member) {
+    return <Alert type="error" message={error ?? 'Member not found'} />;
   }
 
   return (

@@ -63,15 +63,18 @@ Single-file minimal API in `backend/Program.cs`:
 - Endpoint handlers are local functions; `ValidateMember` is shared by create and update.
 - Namespace is `MemberManagementApi.*` even though the project/folder is `backend`.
 - `ApplicationDbContext` overrides `SaveChanges`/`SaveChangesAsync` to stamp
-  `CreatedAt`/`UpdatedAt` automatically - handlers never set them.
+  `CreatedAt` (insert) and `UpdatedAt` (insert + update) from one clock reading -
+  handlers and the entity never set them.
+- A top-level middleware turns any unhandled exception into
+  `{ error: "Internal server error", code: "INTERNAL_ERROR" }` (500) and logs it
+  with request context.
 - Schema is created with `Database.EnsureCreated()` on startup. **No EF
   migrations.** Schema changes require deleting `members.db` in dev.
 - `SeedDatabase` inserts 5 members when the table is empty.
 - `public partial class Program;` at the bottom exists only so the test project
   can reference `Program` via `WebApplicationFactory`.
 - Bind target for create/update is the `MemberRequestDto` record, not the entity.
-- CORS policy `AllowFrontend` permits `localhost:3000` / `127.0.0.1:3000`
-  (unused in practice since the browser only talks to the Next proxy).
+- **No CORS policy** - the browser only ever calls the same-origin Next proxy.
 - HTTPS redirection is disabled for local dev.
 
 ---
@@ -102,9 +105,11 @@ Request body for create/update:
 ### Validation (server-side, source of truth)
 
 - All five fields required and non-whitespace; strings are trimmed before saving.
+- First name / surname <= 100 chars; postal code / mobile <= 20 chars.
 - `dateOfBirth` must be a real date, not the default, and not in the future.
-- Frontend `MemberForm` does required-field checks for UX only; the backend
-  re-validates everything.
+- Frontend `MemberForm` checks required fields and a not-in-the-future date of
+  birth for UX only; the backend re-validates everything. On success the page
+  navigates away, so the form only ever renders errors.
 
 ---
 
@@ -116,12 +121,15 @@ a floating toggle button. On send:
 1. Fetches the current member list for context.
 2. POSTs `{ messages, members }` to `/api/chat`.
 3. `/api/chat` prepends a system prompt (built in `buildSystemPrompt`) and calls
-   OpenRouter. If the model returns valid JSON it is passed through as-is;
-   otherwise the route returns `{ action: null, message: <raw text> }`.
+   OpenRouter. The route pulls the first balanced `{ ... }` block out of the reply
+   (models often wrap JSON in ```` ``` ```` fences or add prose) and returns it;
+   if there is no JSON it returns `{ action: null, message: <raw text> }`.
 4. `applyAiAction` runs the returned `create | edit | delete` via `memberService`,
    then dispatches `members:changed`.
 
-Chat history is component state only - not persisted.
+Only the member `id`, `firstName`, and `surname` are sent to OpenRouter as
+context - not DOB, postal code, or mobile number. Chat history is component state
+only - not persisted.
 
 ### Action contract the model must produce
 
@@ -144,10 +152,6 @@ For non-operations the model returns `{ "action": null, "message": "..." }`. For
 edits, `applyAiAction` fetches the existing member and fills any field the model
 omitted.
 
-Note: the client type and `applyAiAction` use `"edit"`; the human-readable prompt
-template in older docs said `"edit"` as well - keep the client and prompt in sync
-if this changes.
-
 ---
 
 ## Frontend structure
@@ -163,23 +167,25 @@ frontend/src/
       new/page.tsx          Add member (MemberForm -> createMember -> back to /)
       [id]/page.tsx         Edit member (fetch -> MemberForm -> updateMember -> back to /)
     api/
-      members/route.ts, members/[id]/route.ts   backend proxy
+      members/route.ts, members/[id]/route.ts   backend proxy (via lib/proxyToBackend)
       chat/route.ts                             OpenRouter proxy
   components/
-    Button, Input, Modal, Card, Alert, Header   shared UI
-    MemberForm                                  add/edit form, client-side required checks
+    Button, Input, Modal, Card, Alert, Header   shared UI (Modal: role=dialog, Esc, backdrop close)
+    MemberForm                                  add/edit form, client-side checks, errors only
     MemberList                                  table with edit link + delete button, loading/empty states
     ChatSidebar                                 AI assistant panel
     index.ts                                    barrel export
+  lib/backend.ts            BACKEND_API_URL + proxyToBackend() (server-only)
   services/
-    memberService.ts        CRUD against /api/members/*
+    memberService.ts        CRUD against /api/members/* (expects the { data } envelope)
     aiService.ts            chat against /api/chat
-  types/Member.ts           Member, MemberFormData, ApiResponse<T>
-  utils/dateFormatter.ts    formatDate() - timezone-safe YYYY-MM-DD -> "Mon D, YYYY"
+  types/Member.ts           Member, MemberFormData
+  utils/dateFormatter.ts    formatDate() - timezone-safe ISO -> "15 May 1980" (en-GB)
   __tests__/
-    memberService.test.ts, aiService.test.ts
-    components/MemberForm.test.tsx, MemberList.test.tsx
-    e2e/navigation.spec.ts
+    memberService.test.ts, aiService.test.ts, dateFormatter.test.ts
+    api/chat.test.ts, api/members.test.ts
+    components/MemberForm.test.tsx, MemberList.test.tsx, ChatSidebar.test.tsx
+    e2e/members.spec.ts
 ```
 
 Colors are Tailwind tokens defined in `frontend/tailwind.config.ts`:
@@ -192,17 +198,17 @@ Colors are Tailwind tokens defined in `frontend/tailwind.config.ts`:
 
 ```
 backend/
-  Program.cs                    all endpoints, validation, seeding, DTO
+  Program.cs                    all endpoints, validation, seeding, DTO, exception handler
   Models/Member.cs              entity
   Data/ApplicationDbContext.cs  DbSet, model config, timestamp stamping
   appsettings.json              connection string, log levels
+  backend.http                  sample requests
   Properties/launchSettings.json  http profile -> port 5156
 backend.Tests/
-  MembersEndpointsTests.cs      WebApplicationFactory<Program>, isolated temp SQLite per run
+  MembersEndpointsTests.cs      WebApplicationFactory<Program>, a fresh temp SQLite DB per test
 ```
 
-`members.db` is created in the working directory on first run and is not
-git-ignored (nor is it currently committed).
+`members.db` is created in the working directory on first run and is git-ignored.
 
 ---
 
@@ -218,9 +224,13 @@ No solution file; the two .NET projects build independently.
 | Run frontend | `npm run dev` (port 3000) | `frontend/` |
 | Frontend unit/component tests | `npm test` | `frontend/` |
 | Single frontend test | `npm test -- src/__tests__/memberService.test.ts` | `frontend/` |
-| Frontend E2E | `npm run test:e2e` (auto-starts dev server) | `frontend/` |
+| Frontend coverage (enforces thresholds) | `npm test -- --coverage` | `frontend/` |
+| Frontend E2E | `npm run test:e2e` (auto-starts dev server, stubs `/api/*`) | `frontend/` |
 | Lint | `npm run lint` | `frontend/` |
 | Build | `npm run build` / `dotnet build` | resp. dir |
+
+CI (`.github/workflows/ci.yml`) runs `dotnet test`, then `npm ci` + lint + unit +
+build + Playwright on every push to `main` and every PR.
 
 `scripts/start-backend.{sh,bat}` and `stop-backend.{sh,bat}` wrap
 `dotnet build` + `dotnet run` / `pkill -f "dotnet run"`.
@@ -229,37 +239,47 @@ No solution file; the two .NET projects build independently.
 
 ## Test coverage
 
-**Backend** (`MembersEndpointsTests.cs`, 10 tests): list returns seeded members;
-get-by-unknown-id 404; create valid -> 201; create with missing field -> 400
-(theory); create future DOB -> 400; update existing -> 200; update unknown -> 404;
-delete existing -> 204 then 404; delete unknown -> 404. Each test class instance
-runs the real app against its own temp SQLite file.
+**Backend** (`MembersEndpointsTests.cs`, 15 tests): `/health`; list returns the 5
+seeded members; get-by-id success and 404 envelope; create -> 201 with timestamps
+and `Location`; create with missing / blank / overlong / future-DOB field -> 400;
+update existing -> 200 (and `UpdatedAt` bumped); update unknown -> 404; update
+invalid body -> 400; delete existing -> 204 then 404; delete unknown -> 404. A
+fresh `MemberApiFactory` (own temp SQLite file) is created per test, so tests
+never see each other's writes.
 
-**Frontend**:
-- `memberService.test.ts` - getAllMembers success/failure, createMember success
-- `aiService.test.ts` - posts to `/api/chat`, throws friendly error on failure
-- `MemberForm.test.tsx` - required-field errors, submits valid data, pre-fills on edit
-- `MemberList.test.tsx` - loading state, empty state, renders rows, onDelete id
-- `e2e/navigation.spec.ts` - two navigation checks
+**Frontend** (Vitest, 36 tests; coverage thresholds 70% lines/functions/
+statements, 65% branches, enforced with `--coverage`):
+- `memberService.test.ts` - envelope unwrapping, error-message propagation
+- `aiService.test.ts` - posts to `/api/chat`, friendly error on failure
+- `dateFormatter.test.ts` - ISO / datetime / timezone / empty
+- `api/chat.test.ts` - clean JSON passthrough, fenced JSON + prose, no-JSON
+  fallback, missing key -> 500, OpenRouter failure -> 502, PII not forwarded
+- `api/members.test.ts` - status/body passthrough, 404 envelope forwarded,
+  204 has no body, backend-unreachable -> 502
+- `MemberForm.test.tsx` - required errors, future-DOB rejected, submits, surfaces
+  onSubmit error, pre-fills on edit
+- `MemberList.test.tsx` - loading, empty, rows, onDelete id
+- `ChatSidebar.test.tsx` - create/delete actions run, `members:changed` fires,
+  error text shown, non-action reply
+
+**Frontend E2E** (`e2e/members.spec.ts`, Playwright/chromium, stubs `/api/*`):
+list, add, edit, delete-via-modal, AI-chat create.
 
 ---
 
 ## Known gaps and issues
 
-- **`e2e/navigation.spec.ts` is stale.** It clicks `text=View Members` but the
-  header link reads "Members", and asserts `toHaveURL('/members')` even though
-  `/members` redirects to `/`. Both tests are expected to fail as written.
-- **Thin E2E coverage.** No end-to-end specs for the add / edit / delete / AI-chat
-  workflows the original plan called for.
-- **No `ChatSidebar` component test** and no tests for the Next.js proxy routes.
 - **No service/unit layer on the backend**, so there are integration tests only -
   fine for this size, but there is no fast unit tier.
-- **Stale docs:** `frontend/README.md` still references `.env.local` and port
-  5000; the real config is repo-root `.env` and port 5156.
-- **`.gitignore` is minimal** (`.env`, `bin/`, `obj/`) - `node_modules/`,
-  `.next/`, `members.db`, and Playwright/Vitest output are not ignored.
 - **AI edit relies on the model returning the correct `id`** from the member list
   it was given; there is no fuzzy name matching or disambiguation.
+- **`/api/chat` is an unauthenticated proxy to a paid API.** Fine locally; a
+  deployment would need at least a shared-secret check or rate limit.
+- **`MemberList` is a scrolling table on mobile**, not a stacked-card layout.
+- **`.eslintrc.json` is the deprecated ESLint config format**; `next lint` still
+  reads it but both are on the way out.
+- **Server-side `fetch` calls have no timeout/abort** - a hung backend or
+  OpenRouter request ties up the Next request until the platform timeout.
 
 ---
 
